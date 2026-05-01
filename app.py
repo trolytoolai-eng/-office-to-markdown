@@ -454,6 +454,19 @@ else:
                 new_ws_pass = st.text_input("Password", value=ws_pass, type="password")
             if new_ws_user and new_ws_pass:
                 st.success("✅ Proxy ready")
+                
+                if st.button("🔄 Kiểm tra kết nối Proxy"):
+                    with st.spinner("Đang kiểm tra..."):
+                        try:
+                            import requests
+                            proxy_url = f"http://{new_ws_user}:{new_ws_pass}@p.webshare.io:80"
+                            res = requests.get("https://api.myip.com", proxies={"http": proxy_url, "https": proxy_url}, timeout=10)
+                            if res.status_code == 200:
+                                st.success(f"Kết nối thành công! IP của proxy: {res.json().get('ip')}")
+                            else:
+                                st.error(f"Proxy lỗi HTTP {res.status_code}: {res.text}")
+                        except Exception as e:
+                            st.error(f"Lỗi kết nối proxy: {str(e)}")
         elif new_proxy_mode == "Custom URL":
             new_custom_proxy_raw = st.text_input(
                 "Proxy",
@@ -556,11 +569,8 @@ def get_youtube_metadata(url):
 
 def create_ytt_api(p_mode, p_user, p_pass, p_custom):
     if p_mode == "Webshare" and p_user and p_pass and WebshareProxyConfig:
-        import urllib.parse
-        enc_user = urllib.parse.quote(p_user, safe='')
-        enc_pass = urllib.parse.quote(p_pass, safe='')
         return YouTubeTranscriptApi(proxy_config=WebshareProxyConfig(
-            proxy_username=enc_user, proxy_password=enc_pass,
+            proxy_username=p_user, proxy_password=p_pass,
         ))
     elif p_mode == "Custom URL" and p_custom and GenericProxyConfig:
         url = parse_proxy_input(p_custom)
