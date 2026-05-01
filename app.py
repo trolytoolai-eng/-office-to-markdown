@@ -570,11 +570,19 @@ def get_youtube_metadata(url):
     return title, description
 
 def create_ytt_api(p_mode, p_user, p_pass, p_custom):
+    class SafeWebshareProxyConfig(GenericProxyConfig):
+        @property
+        def prevent_keeping_connections_alive(self) -> bool:
+            return True
+        @property
+        def retries_when_blocked(self) -> int:
+            return 10
+
     if p_mode == "Webshare" and p_user and p_pass and GenericProxyConfig:
         user = p_user.strip()
         pwd = p_pass.strip()
         url = f"http://{user}:{pwd}@p.webshare.io:80"
-        return YouTubeTranscriptApi(proxy_config=GenericProxyConfig(
+        return YouTubeTranscriptApi(proxy_config=SafeWebshareProxyConfig(
             http_url=url, https_url=url,
         ))
     elif p_mode == "Custom URL" and p_custom and GenericProxyConfig:
@@ -596,10 +604,10 @@ def get_youtube_transcript(url, p_mode, p_user, p_pass, p_custom):
         text = ' '.join([s.text for s in transcript.snippets])
     except Exception as e:
         msg = str(e)
-        if any(k in msg for k in ["RequestBlocked", "IpBlocked", "429"]):
+        if any(k in msg for k in ["RequestBlocked", "IpBlocked", "429", "no element found"]):
             return None, title, (
-                f"🚫 IP bị YouTube chặn.\n\n"
-                "Mở **sidebar ⚙️** → cấu hình Proxy để vượt qua."
+                f"🚫 IP Proxy vừa dùng đã bị YouTube chặn.\n\n"
+                "💡 Mẹo: Vì Webshare là **Rotating Proxy**, bạn chỉ cần bấm **Convert to Markdown ->** thêm 1-2 lần nữa để nó đổi IP khác là sẽ thành công!"
             )
         return None, title, f"Lỗi: {msg}"
 
