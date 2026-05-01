@@ -14,10 +14,11 @@ except ImportError:
 
 try:
     from youtube_transcript_api import YouTubeTranscriptApi
-    from youtube_transcript_api.proxies import GenericProxyConfig
+    from youtube_transcript_api.proxies import GenericProxyConfig, WebshareProxyConfig
 except ImportError:
     YouTubeTranscriptApi = None
     GenericProxyConfig = None
+    WebshareProxyConfig = None
 
 st.set_page_config(page_title="Office to Markdown", page_icon="📝")
 
@@ -25,19 +26,39 @@ st.set_page_config(page_title="Office to Markdown", page_icon="📝")
 with st.sidebar:
     st.header("⚙️ Cài đặt Proxy")
     st.caption(
-        "Khi deploy lên cloud (Streamlit Cloud, AWS...), YouTube sẽ chặn IP. "
-        "Nhập proxy để vượt qua giới hạn này. Bỏ trống nếu dùng trên máy cá nhân."
+        "Khi deploy lên cloud, YouTube sẽ chặn IP. "
+        "Cấu hình proxy để vượt qua. Bỏ trống nếu dùng trên máy cá nhân."
     )
-    proxy_url = st.text_input(
-        "Proxy URL",
-        placeholder="http://user:pass@proxy-host:port",
-        help="Hỗ trợ HTTP/HTTPS/SOCKS proxy. Ví dụ: http://user:pass@p.webshare.io:80",
-        type="password"
+    proxy_mode = st.radio(
+        "Loại Proxy:",
+        ["Không dùng (Local)", "Webshare (Khuyên dùng)", "Custom Proxy URL"],
+        help="Webshare residential proxy ổn định nhất cho YouTube."
     )
-    if proxy_url:
-        st.success("✅ Proxy đã được cấu hình.")
+
+    ws_user = ""
+    ws_pass = ""
+    custom_proxy_raw = ""
+
+    if proxy_mode == "Webshare (Khuyên dùng)":
+        st.markdown(
+            "Đăng ký tại [webshare.io](https://www.webshare.io/) → mua gói **Residential** "
+            "→ vào [Proxy Settings](https://proxy2.webshare.io/proxy/settings) lấy Username & Password."
+        )
+        ws_user = st.text_input("Proxy Username", placeholder="your_webshare_username")
+        ws_pass = st.text_input("Proxy Password", placeholder="your_webshare_password", type="password")
+        if ws_user and ws_pass:
+            st.success("✅ Webshare proxy đã cấu hình.")
+    elif proxy_mode == "Custom Proxy URL":
+        custom_proxy_raw = st.text_input(
+            "Proxy",
+            placeholder="IP:PORT:USER:PASS hoặc http://user:pass@host:port",
+            help="Paste từ nhà cung cấp proxy (vd: 31.59.20.176:6754:user:pass)",
+            type="password"
+        )
+        if custom_proxy_raw:
+            st.success("✅ Custom proxy đã cấu hình.")
     else:
-        st.info("ℹ️ Không dùng proxy (phù hợp chạy local).")
+        st.info("ℹ️ Không dùng proxy.")
 
 st.markdown("<h1>Office to Markdown</h1>", unsafe_allow_html=True)
 st.markdown("### 📄 Word, Excel, PDF ➡️ **Markdown (M↓)**")
@@ -63,6 +84,35 @@ else:
         placeholder="https://www.youtube.com/watch?v=...",
         help="Dán link YouTube vào đây để lấy transcript"
     )
+
+
+def parse_proxy_input(raw):
+    """Chuyển đổi proxy từ nhiều format khác nhau sang URL chuẩn.
+    Hỗ trợ:
+      - IP:PORT:USER:PASS  (Webshare export format)
+      - USER:PASS@IP:PORT
+      - http://user:pass@host:port  (URL format)
+    """
+    raw = raw.strip()
+    if not raw:
+        return ""
+    # Nếu đã là URL format (bắt đầu bằng http/https/socks)
+    if raw.startswith(("http://", "https://", "socks")):
+        return raw
+    parts = raw.split(":")
+    # Format: IP:PORT:USER:PASS
+    if len(parts) == 4:
+        host, port, user, password = parts
+        return f"http://{user}:{password}@{host}:{port}"
+    # Format: USER:PASS@IP:PORT
+    if "@" in raw:
+        try:
+            creds, server = raw.rsplit("@", 1)
+            return f"http://{creds}@{server}"
+        except ValueError:
+            pass
+    # Fallback: trả nguyên
+    return f"http://{raw}"
 
 
 def sanitize_filename(name):
@@ -120,19 +170,26 @@ def get_youtube_metadata(url):
     return title, description
 
 
-def create_ytt_api(proxy_url_str):
-    """Tạo YouTubeTranscriptApi instance, có hoặc không có proxy."""
-    if proxy_url_str and GenericProxyConfig is not None:
+def create_ytt_api(proxy_mode_val, ws_user_val="", ws_pass_val="", custom_proxy_str=""):
+    """Tạo YouTubeTranscriptApi instance với proxy phù hợp."""
+    if proxy_mode_val == "Webshare (Khuyên dùng)" and ws_user_val and ws_pass_val and WebshareProxyConfig is not None:
+        proxy_config = WebshareProxyConfig(
+            proxy_username=ws_user_val,
+            proxy_password=ws_pass_val,
+        )
+        return YouTubeTranscriptApi(proxy_config=proxy_config)
+    elif proxy_mode_val == "Custom Proxy URL" and custom_proxy_str and GenericProxyConfig is not None:
+        proxy_url = parse_proxy_input(custom_proxy_str)
         proxy_config = GenericProxyConfig(
-            http_url=proxy_url_str,
-            https_url=proxy_url_str,
+            http_url=proxy_url,
+            https_url=proxy_url,
         )
         return YouTubeTranscriptApi(proxy_config=proxy_config)
     else:
         return YouTubeTranscriptApi()
 
 
-def get_youtube_transcript(url, proxy_url_str=""):
+def get_youtube_transcript(url, proxy_mode_val="", ws_user_val="", ws_pass_val="", custom_proxy_str=""):
     """Lấy transcript YouTube bằng youtube_transcript_api + metadata bằng yt-dlp."""
     video_id = extract_video_id(url)
     if not video_id:
@@ -146,7 +203,7 @@ def get_youtube_transcript(url, proxy_url_str=""):
         return None, title, "Thư viện youtube_transcript_api chưa được cài đặt."
 
     try:
-        ytt_api = create_ytt_api(proxy_url_str)
+        ytt_api = create_ytt_api(proxy_mode_val, ws_user_val, ws_pass_val, custom_proxy_str)
         transcript = ytt_api.fetch(video_id)
         transcript_text = ' '.join([snippet.text for snippet in transcript.snippets])
     except Exception as e:
@@ -201,7 +258,13 @@ if st.button("Convert to Markdown", type="primary", use_container_width=True):
                     output_filename = make_output_filename(base_name, "file")
 
                 elif mode == "🔗 YouTube URL" and youtube_url:
-                    content, video_title, error = get_youtube_transcript(youtube_url, proxy_url)
+                    content, video_title, error = get_youtube_transcript(
+                        youtube_url,
+                        proxy_mode_val=proxy_mode,
+                        ws_user_val=ws_user,
+                        ws_pass_val=ws_pass,
+                        custom_proxy_str=custom_proxy_raw
+                    )
                     if error:
                         st.error(f"❌ {error}")
                         st.stop()
