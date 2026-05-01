@@ -9,7 +9,7 @@ from datetime import datetime
 try:
     from markitdown import MarkItDown
 except ImportError:
-    st.error("Thư viện markitdown chưa được cài đặt. Vui lòng kiểm tra lại.")
+    st.error("Thư viện markitdown chưa được cài đặt.")
     st.stop()
 
 try:
@@ -20,285 +20,584 @@ except ImportError:
     GenericProxyConfig = None
     WebshareProxyConfig = None
 
-st.set_page_config(page_title="Office to Markdown", page_icon="📝")
+# ─────────────────────────────────────────────
+# PAGE CONFIG
+# ─────────────────────────────────────────────
+st.set_page_config(
+    page_title="Office to Markdown",
+    page_icon="📝",
+    layout="centered",
+    initial_sidebar_state="auto",
+)
 
-# --- Sidebar: Proxy Settings ---
+# ─────────────────────────────────────────────
+# CUSTOM CSS — Eco-Modern Design System
+# Inspired by "Don't Make Me Think" principles
+# ─────────────────────────────────────────────
+st.markdown("""
+<style>
+    /* ── Google Fonts ── */
+    @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&display=swap');
+
+    /* ── Root Variables ── */
+    :root {
+        --bg-warm: #f5f5f0;
+        --bg-card: #ffffff;
+        --primary: #2e7d32;
+        --primary-light: #4caf50;
+        --primary-hover: #1b5e20;
+        --accent-blue: #29b6f6;
+        --text-dark: #1a1a1a;
+        --text-muted: #6b7280;
+        --text-light: #9ca3af;
+        --border: #e5e7e0;
+        --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+        --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+        --shadow-lg: 0 8px 32px rgba(0,0,0,0.10);
+        --radius-sm: 12px;
+        --radius-md: 20px;
+        --radius-lg: 28px;
+        --radius-pill: 999px;
+    }
+
+    /* ── Global Background ── */
+    .stApp, .main, [data-testid="stAppViewContainer"] {
+        background-color: var(--bg-warm) !important;
+    }
+    .block-container {
+        max-width: 720px !important;
+        padding-top: 2rem !important;
+        padding-bottom: 4rem !important;
+    }
+
+    /* ── Hide Streamlit chrome (keep sidebar toggle visible) ── */
+    #MainMenu, footer, [data-testid="stToolbar"] { display: none !important; }
+
+    /* ── Typography ── */
+    h1, h2, h3 { font-family: 'DM Serif Display', Georgia, serif !important; color: var(--text-dark) !important; }
+    p, span, label, li, div { font-family: 'Inter', -apple-system, sans-serif !important; }
+    h1 { font-size: 2.4rem !important; letter-spacing: -0.02em !important; }
+
+    /* ── Card-style containers ── */
+    [data-testid="stVerticalBlock"] > div > div[data-testid="stExpander"] {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md) !important;
+        box-shadow: var(--shadow-sm);
+    }
+
+    /* ── File uploader area ── */
+    [data-testid="stFileUploader"] section {
+        border-radius: var(--radius-md) !important;
+        border: 2px dashed var(--border) !important;
+        background: var(--bg-card) !important;
+        padding: 2rem 1.5rem !important;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    [data-testid="stFileUploader"] section:hover {
+        border-color: var(--primary-light) !important;
+        box-shadow: var(--shadow-md) !important;
+    }
+    [data-testid="stFileUploader"] small {
+        color: var(--text-muted) !important;
+    }
+    /* Fix: nút Browse bị hiện chữ đè */
+    [data-testid="stFileUploader"] button {
+        border-radius: var(--radius-pill) !important;
+        background: var(--primary) !important;
+        color: transparent !important;
+        border: none !important;
+        padding: 0.5rem 1.5rem !important;
+        font-size: 0 !important;
+        font-weight: 600 !important;
+        overflow: hidden !important;
+        position: relative !important;
+        min-height: 38px !important;
+    }
+    [data-testid="stFileUploader"] button * {
+        font-size: 0 !important;
+        color: transparent !important;
+    }
+    [data-testid="stFileUploader"] button::after {
+        content: "Browse files";
+        font-size: 0.85rem !important;
+        font-family: 'Inter', sans-serif !important;
+        color: white !important;
+        position: absolute !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+    }
+
+    /* ── Text inputs ── */
+    input[type="text"], input[type="password"],
+    [data-testid="stTextInput"] input {
+        border-radius: var(--radius-sm) !important;
+        border: 1.5px solid var(--border) !important;
+        padding: 0.75rem 1rem !important;
+        font-size: 0.95rem !important;
+        color: var(--text-dark) !important;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        background: var(--bg-card) !important;
+    }
+    input[type="text"]::placeholder, input[type="password"]::placeholder {
+        color: var(--text-muted) !important;
+        opacity: 0.7 !important;
+    }
+    input[type="text"]:focus, input[type="password"]:focus,
+    [data-testid="stTextInput"] input:focus {
+        border-color: var(--primary) !important;
+        box-shadow: 0 0 0 3px rgba(46,125,50,0.12) !important;
+    }
+
+    /* ── Primary button (Convert) ── */
+    [data-testid="stBaseButton-primary"],
+    button[kind="primary"] {
+        background: var(--primary) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: var(--radius-pill) !important;
+        padding: 0.85rem 2rem !important;
+        font-size: 1.05rem !important;
+        font-weight: 600 !important;
+        font-family: 'Inter', sans-serif !important;
+        letter-spacing: 0.01em !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        box-shadow: 0 4px 14px rgba(46,125,50,0.25) !important;
+    }
+    [data-testid="stBaseButton-primary"]:hover,
+    button[kind="primary"]:hover {
+        background: var(--primary-hover) !important;
+        box-shadow: 0 6px 20px rgba(46,125,50,0.35) !important;
+        transform: translateY(-1px) !important;
+    }
+
+    /* ── Download button ── */
+    [data-testid="stDownloadButton"] button {
+        background: var(--bg-card) !important;
+        color: var(--primary) !important;
+        border: 2px solid var(--primary) !important;
+        border-radius: var(--radius-pill) !important;
+        font-weight: 600 !important;
+        font-family: 'Inter', sans-serif !important;
+        transition: all 0.3s ease !important;
+    }
+    [data-testid="stDownloadButton"] button:hover {
+        background: var(--primary) !important;
+        color: white !important;
+    }
+
+    /* ── Radio buttons (mode selector) ── */
+    [data-testid="stRadio"] > div {
+        gap: 0.5rem !important;
+    }
+    [data-testid="stRadio"] label {
+        background: var(--bg-card) !important;
+        border: 1.5px solid var(--border) !important;
+        border-radius: var(--radius-sm) !important;
+        padding: 0.6rem 1rem !important;
+        transition: all 0.25s ease !important;
+        cursor: pointer !important;
+    }
+    [data-testid="stRadio"] label:hover {
+        border-color: var(--primary-light) !important;
+        box-shadow: var(--shadow-sm) !important;
+    }
+
+    /* ── Alerts (success, warning, error) ── */
+    [data-testid="stAlert"] {
+        border-radius: var(--radius-sm) !important;
+        border-left-width: 4px !important;
+    }
+
+    /* ── Text area (preview) ── */
+    [data-testid="stTextArea"] textarea {
+        border-radius: var(--radius-md) !important;
+        border: 1.5px solid var(--border) !important;
+        background: var(--bg-card) !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 0.9rem !important;
+        line-height: 1.7 !important;
+    }
+
+    /* ── Sidebar ── */
+    [data-testid="stSidebar"] {
+        background: var(--bg-card) !important;
+        border-right: 1px solid var(--border) !important;
+    }
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2 {
+        font-size: 1.2rem !important;
+    }
+
+    /* ── Spinner ── */
+    [data-testid="stSpinner"] {
+        color: var(--primary) !important;
+    }
+
+    /* ── Divider ── */
+    hr {
+        border-color: var(--border) !important;
+        margin: 2rem 0 !important;
+    }
+
+    /* ── Smooth scrolling ── */
+    html { scroll-behavior: smooth; }
+
+    /* ── Custom hero badge ── */
+    .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(46,125,50,0.08);
+        color: var(--primary);
+        border: 1px solid rgba(46,125,50,0.2);
+        border-radius: var(--radius-pill);
+        padding: 6px 16px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        font-family: 'Inter', sans-serif;
+        letter-spacing: 0.02em;
+        margin-bottom: 1rem;
+    }
+    .hero-subtitle {
+        color: var(--text-muted);
+        font-family: 'Inter', sans-serif;
+        font-size: 1.05rem;
+        line-height: 1.65;
+        max-width: 540px;
+    }
+    .format-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 0.8rem;
+    }
+    .format-chip {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-pill);
+        padding: 5px 14px;
+        font-size: 0.78rem;
+        font-family: 'Inter', sans-serif;
+        font-weight: 500;
+        color: var(--text-muted);
+        transition: all 0.2s ease;
+    }
+    .format-chip:hover {
+        border-color: var(--primary-light);
+        color: var(--primary);
+        background: rgba(46,125,50,0.04);
+    }
+    .section-label {
+        font-family: 'Inter', sans-serif;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 0.6rem;
+    }
+    .result-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 1.5rem;
+        box-shadow: var(--shadow-sm);
+        margin-top: 1rem;
+    }
+    .result-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 1rem;
+        font-family: 'Inter', sans-serif;
+    }
+    .result-icon {
+        width: 36px;
+        height: 36px;
+        background: rgba(46,125,50,0.1);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+    }
+    .result-title {
+        font-weight: 600;
+        color: var(--text-dark);
+        font-size: 0.95rem;
+    }
+    .result-meta {
+        color: var(--text-light);
+        font-size: 0.78rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+
+# ─────────────────────────────────────────────
+# SIDEBAR — Proxy Settings (collapsed by default)
+# ─────────────────────────────────────────────
 with st.sidebar:
-    st.header("⚙️ Cài đặt Proxy")
-    st.caption(
-        "Khi deploy lên cloud, YouTube sẽ chặn IP. "
-        "Cấu hình proxy để vượt qua. Bỏ trống nếu dùng trên máy cá nhân."
-    )
+    st.markdown("### ⚙️ Proxy Settings")
+    st.caption("Cấu hình proxy khi YouTube chặn IP trên cloud.")
+
     proxy_mode = st.radio(
         "Loại Proxy:",
-        ["Không dùng (Local)", "Webshare (Khuyên dùng)", "Custom Proxy URL"],
-        help="Webshare residential proxy ổn định nhất cho YouTube."
+        ["Không dùng (Local)", "Webshare", "Custom URL"],
     )
 
     ws_user = ""
     ws_pass = ""
     custom_proxy_raw = ""
 
-    if proxy_mode == "Webshare (Khuyên dùng)":
+    if proxy_mode == "Webshare":
         st.markdown(
-            "Đăng ký tại [webshare.io](https://www.webshare.io/) → mua gói **Residential** "
-            "→ vào [Proxy Settings](https://proxy2.webshare.io/proxy/settings) lấy Username & Password."
+            "[webshare.io](https://www.webshare.io/) → gói **Residential** "
+            "→ [Proxy Settings](https://proxy2.webshare.io/proxy/settings)"
         )
-        ws_user = st.text_input("Proxy Username", placeholder="your_webshare_username")
-        ws_pass = st.text_input("Proxy Password", placeholder="your_webshare_password", type="password")
+        ws_user = st.text_input("Username", placeholder="webshare_username")
+        ws_pass = st.text_input("Password", type="password")
         if ws_user and ws_pass:
-            st.success("✅ Webshare proxy đã cấu hình.")
-    elif proxy_mode == "Custom Proxy URL":
+            st.success("✅ Proxy ready")
+    elif proxy_mode == "Custom URL":
         custom_proxy_raw = st.text_input(
             "Proxy",
-            placeholder="IP:PORT:USER:PASS hoặc http://user:pass@host:port",
-            help="Paste từ nhà cung cấp proxy (vd: 31.59.20.176:6754:user:pass)",
+            placeholder="IP:PORT:USER:PASS",
             type="password"
         )
         if custom_proxy_raw:
-            st.success("✅ Custom proxy đã cấu hình.")
-    else:
-        st.info("ℹ️ Không dùng proxy.")
+            st.success("✅ Proxy ready")
 
-st.markdown("<h1>Office to Markdown</h1>", unsafe_allow_html=True)
-st.markdown("### 📄 Word, Excel, PDF ➡️ **Markdown (M↓)**")
 
-# --- Chọn chế độ ---
-mode = st.radio(
-    "Chọn cách chuyển đổi:",
-    ["📁 Upload File", "🔗 YouTube URL"],
-    horizontal=True
+# ─────────────────────────────────────────────
+# HERO SECTION
+# ─────────────────────────────────────────────
+st.markdown('<div class="hero-badge">✨ Powered by Microsoft MarkItDown</div>', unsafe_allow_html=True)
+st.markdown("# Office to Markdown")
+st.markdown(
+    '<p class="hero-subtitle">'
+    'Chuyển đổi tài liệu Office và video YouTube thành Markdown '
+    'chỉ trong vài giây — sẵn sàng cho AI & LLMs.'
+    '</p>',
+    unsafe_allow_html=True
 )
 
+# Format chips
+formats = ["PDF", "DOCX", "XLSX", "PPTX", "HTML", "CSV", "JSON", "XML", "EPUB", "ZIP", "YouTube"]
+chips_html = '<div class="format-chips">' + ''.join(
+    [f'<span class="format-chip">{f}</span>' for f in formats]
+) + '</div>'
+st.markdown(chips_html, unsafe_allow_html=True)
+
+st.markdown("---")
+
+# ─────────────────────────────────────────────
+# MODE SELECTOR — One thing at a time
+# ─────────────────────────────────────────────
+st.markdown('<p class="section-label">Chọn nguồn dữ liệu</p>', unsafe_allow_html=True)
+mode = st.radio(
+    "mode_selector",
+    ["📁  Upload File", "🔗  YouTube URL"],
+    horizontal=True,
+    label_visibility="collapsed"
+)
+
+st.markdown("")  # spacer
+
+# ─────────────────────────────────────────────
+# INPUT AREA
+# ─────────────────────────────────────────────
 uploaded_file = None
 youtube_url = ""
 
-if mode == "📁 Upload File":
+if mode == "📁  Upload File":
     uploaded_file = st.file_uploader(
-        "Upload a file to convert",
-        help="Supported: DOCX, PDF, EPUB, XLSX, PPTX, HTML, CSV, JSON, XML, ZIP"
+        "Kéo thả hoặc chọn file cần chuyển đổi",
+        help="DOCX, PDF, EPUB, XLSX, PPTX, HTML, CSV, JSON, XML, ZIP"
     )
 else:
     youtube_url = st.text_input(
-        "Enter a YouTube URL",
+        "Dán link YouTube",
         placeholder="https://www.youtube.com/watch?v=...",
-        help="Dán link YouTube vào đây để lấy transcript"
+        label_visibility="visible"
     )
 
+st.markdown("")  # spacer
+
+
+# ─────────────────────────────────────────────
+# UTILITY FUNCTIONS
+# ─────────────────────────────────────────────
+def sanitize_filename(name):
+    name = re.sub(r'[<>:"/\\|?*]', '', name)
+    name = re.sub(r'\s+', '_', name.strip())
+    return name[:80]
+
+def make_output_filename(source_name, source_type="file"):
+    date_str = datetime.now().strftime("%Y%m%d")
+    clean_name = sanitize_filename(source_name)
+    prefix = "YT" if source_type == "youtube" else "File"
+    return f"{prefix}_{clean_name}_{date_str}.md"
+
+def extract_video_id(url):
+    for pattern in [
+        r'(?:v=|/v/|youtu\.be/)([a-zA-Z0-9_-]{11})',
+        r'(?:embed/)([a-zA-Z0-9_-]{11})',
+        r'(?:shorts/)([a-zA-Z0-9_-]{11})',
+    ]:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    return None
 
 def parse_proxy_input(raw):
-    """Chuyển đổi proxy từ nhiều format khác nhau sang URL chuẩn.
-    Hỗ trợ:
-      - IP:PORT:USER:PASS  (Webshare export format)
-      - USER:PASS@IP:PORT
-      - http://user:pass@host:port  (URL format)
-    """
     raw = raw.strip()
     if not raw:
         return ""
-    # Nếu đã là URL format (bắt đầu bằng http/https/socks)
     if raw.startswith(("http://", "https://", "socks")):
         return raw
     parts = raw.split(":")
-    # Format: IP:PORT:USER:PASS
     if len(parts) == 4:
         host, port, user, password = parts
         return f"http://{user}:{password}@{host}:{port}"
-    # Format: USER:PASS@IP:PORT
     if "@" in raw:
         try:
             creds, server = raw.rsplit("@", 1)
             return f"http://{creds}@{server}"
         except ValueError:
             pass
-    # Fallback: trả nguyên
     return f"http://{raw}"
 
-
-def sanitize_filename(name):
-    """Loại bỏ ký tự đặc biệt, giữ lại tên file sạch."""
-    name = re.sub(r'[<>:"/\\|?*]', '', name)
-    name = re.sub(r'\s+', '_', name.strip())
-    name = name[:80]  # Giới hạn độ dài
-    return name
-
-
-def make_output_filename(source_name, source_type="file"):
-    """Tạo tên file output khoa học: [nguồn]_[tên gốc]_[ngày].md"""
-    date_str = datetime.now().strftime("%Y%m%d")
-    clean_name = sanitize_filename(source_name)
-    if source_type == "youtube":
-        return f"YT_{clean_name}_{date_str}.md"
-    else:
-        return f"File_{clean_name}_{date_str}.md"
-
-
-def extract_video_id(url):
-    """Trích xuất video ID từ URL YouTube."""
-    patterns = [
-        r'(?:v=|/v/|youtu\.be/)([a-zA-Z0-9_-]{11})',
-        r'(?:embed/)([a-zA-Z0-9_-]{11})',
-        r'(?:shorts/)([a-zA-Z0-9_-]{11})',
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, url)
-        if match:
-            return match.group(1)
-    return None
-
-
 def get_youtube_metadata(url):
-    """Lấy metadata video: dùng YouTube oEmbed API (không bị chặn IP), fallback sang yt-dlp."""
     import requests as req
     title = ""
     description = ""
-
-    # Cách 1: YouTube oEmbed API — miễn phí, không bị chặn IP
     try:
         oembed_url = f"https://www.youtube.com/oembed?url={url}&format=json"
         resp = req.get(oembed_url, timeout=10)
         if resp.status_code == 200:
-            data = resp.json()
-            title = data.get("title", "")
+            title = resp.json().get("title", "")
     except Exception:
         pass
-
-    # Cách 2: Fallback sang yt-dlp nếu oEmbed không lấy được (lấy thêm description)
     if not title:
         try:
-            meta_cmd = [
-                "python", "-m", "yt_dlp",
-                "--dump-json", "--no-download",
-                "--skip-download",
-                url
-            ]
-            meta_result = subprocess.run(
-                meta_cmd, capture_output=True, text=True, timeout=30, encoding='utf-8'
+            r = subprocess.run(
+                ["python", "-m", "yt_dlp", "--dump-json", "--no-download", "--skip-download", url],
+                capture_output=True, text=True, timeout=30, encoding='utf-8'
             )
-            if meta_result.returncode == 0 and meta_result.stdout.strip():
-                meta = json.loads(meta_result.stdout)
+            if r.returncode == 0 and r.stdout.strip():
+                meta = json.loads(r.stdout)
                 title = meta.get("title", "")
                 description = meta.get("description", "")
         except Exception:
             pass
-
     return title, description
 
+def create_ytt_api():
+    if proxy_mode == "Webshare" and ws_user and ws_pass and WebshareProxyConfig:
+        return YouTubeTranscriptApi(proxy_config=WebshareProxyConfig(
+            proxy_username=ws_user, proxy_password=ws_pass,
+        ))
+    elif proxy_mode == "Custom URL" and custom_proxy_raw and GenericProxyConfig:
+        url = parse_proxy_input(custom_proxy_raw)
+        return YouTubeTranscriptApi(proxy_config=GenericProxyConfig(
+            http_url=url, https_url=url,
+        ))
+    return YouTubeTranscriptApi()
 
-def create_ytt_api(proxy_mode_val, ws_user_val="", ws_pass_val="", custom_proxy_str=""):
-    """Tạo YouTubeTranscriptApi instance với proxy phù hợp."""
-    if proxy_mode_val == "Webshare (Khuyên dùng)" and ws_user_val and ws_pass_val and WebshareProxyConfig is not None:
-        proxy_config = WebshareProxyConfig(
-            proxy_username=ws_user_val,
-            proxy_password=ws_pass_val,
-        )
-        return YouTubeTranscriptApi(proxy_config=proxy_config)
-    elif proxy_mode_val == "Custom Proxy URL" and custom_proxy_str and GenericProxyConfig is not None:
-        proxy_url = parse_proxy_input(custom_proxy_str)
-        proxy_config = GenericProxyConfig(
-            http_url=proxy_url,
-            https_url=proxy_url,
-        )
-        return YouTubeTranscriptApi(proxy_config=proxy_config)
-    else:
-        return YouTubeTranscriptApi()
-
-
-def get_youtube_transcript(url, proxy_mode_val="", ws_user_val="", ws_pass_val="", custom_proxy_str=""):
-    """Lấy transcript YouTube bằng youtube_transcript_api + metadata bằng yt-dlp."""
+def get_youtube_transcript(url):
     video_id = extract_video_id(url)
     if not video_id:
-        return None, None, "Không thể trích xuất Video ID từ URL."
-
-    # Lấy metadata
+        return None, None, "Không thể trích xuất Video ID."
     title, description = get_youtube_metadata(url)
-
-    # Lấy transcript bằng youtube_transcript_api
-    if YouTubeTranscriptApi is None:
-        return None, title, "Thư viện youtube_transcript_api chưa được cài đặt."
-
+    if not YouTubeTranscriptApi:
+        return None, title, "youtube_transcript_api chưa được cài."
     try:
-        ytt_api = create_ytt_api(proxy_mode_val, ws_user_val, ws_pass_val, custom_proxy_str)
-        transcript = ytt_api.fetch(video_id)
-        transcript_text = ' '.join([snippet.text for snippet in transcript.snippets])
+        transcript = create_ytt_api().fetch(video_id)
+        text = ' '.join([s.text for s in transcript.snippets])
     except Exception as e:
-        error_msg = str(e)
-        if "RequestBlocked" in error_msg or "IpBlocked" in error_msg or "429" in error_msg:
+        msg = str(e)
+        if any(k in msg for k in ["RequestBlocked", "IpBlocked", "429"]):
             return None, title, (
-                f"🚫 IP bị YouTube chặn: {error_msg}\n\n"
-                "**Cách khắc phục:** Mở thanh bên trái ⚙️ Cài đặt Proxy → nhập proxy URL.\n"
-                "Bạn có thể dùng dịch vụ proxy miễn phí/trả phí như Webshare, ProxyScrape..."
+                f"🚫 IP bị YouTube chặn.\n\n"
+                "Mở **sidebar ⚙️** → cấu hình Proxy để vượt qua."
             )
-        return None, title, f"Không lấy được transcript: {error_msg}"
+        return None, title, f"Lỗi: {msg}"
 
-    # Ghép thành Markdown
-    md_parts = []
-    md_parts.append(f"# {title}" if title else "# YouTube Video")
-    md_parts.append("")
-    md_parts.append(f"**URL:** {url}")
-    md_parts.append("")
+    parts = [f"# {title}" if title else "# YouTube Video", "", f"**URL:** {url}", ""]
     if description:
-        md_parts.append("## Description")
-        md_parts.append(description)
-        md_parts.append("")
-    md_parts.append("## Transcript")
-    md_parts.append("")
-    md_parts.append(transcript_text)
-
-    return '\n'.join(md_parts), title, None
+        parts += ["## Description", description, ""]
+    parts += ["## Transcript", "", text]
+    return '\n'.join(parts), title, None
 
 
-if st.button("Convert to Markdown", type="primary", use_container_width=True):
-    if mode == "📁 Upload File" and not uploaded_file:
-        st.warning("⚠️ Vui lòng tải lên một file.")
-    elif mode == "🔗 YouTube URL" and not youtube_url:
-        st.warning("⚠️ Vui lòng nhập link YouTube.")
+# ─────────────────────────────────────────────
+# CONVERT BUTTON & RESULTS
+# ─────────────────────────────────────────────
+if st.button("Convert to Markdown  →", type="primary", use_container_width=True):
+    if mode == "📁  Upload File" and not uploaded_file:
+        st.warning("Vui lòng chọn một file để chuyển đổi.")
+    elif mode == "🔗  YouTube URL" and not youtube_url:
+        st.warning("Vui lòng dán link YouTube.")
     else:
-        with st.spinner("Đang chuyển đổi sang Markdown..."):
+        with st.spinner("Đang chuyển đổi…"):
             try:
                 result_content = ""
                 output_filename = "output.md"
 
-                if mode == "📁 Upload File" and uploaded_file:
+                if mode == "📁  Upload File" and uploaded_file:
                     md = MarkItDown()
                     suffix = os.path.splitext(uploaded_file.name)[1]
                     base_name = os.path.splitext(uploaded_file.name)[0]
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
-                        tmp_file.write(uploaded_file.getbuffer())
-                        tmp_path = tmp_file.name
-
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                        tmp.write(uploaded_file.getbuffer())
+                        tmp_path = tmp.name
                     result = md.convert(tmp_path)
                     result_content = result.text_content
                     os.unlink(tmp_path)
                     output_filename = make_output_filename(base_name, "file")
 
-                elif mode == "🔗 YouTube URL" and youtube_url:
-                    content, video_title, error = get_youtube_transcript(
-                        youtube_url,
-                        proxy_mode_val=proxy_mode,
-                        ws_user_val=ws_user,
-                        ws_pass_val=ws_pass,
-                        custom_proxy_str=custom_proxy_raw
-                    )
+                elif mode == "🔗  YouTube URL" and youtube_url:
+                    content, video_title, error = get_youtube_transcript(youtube_url)
                     if error:
                         st.error(f"❌ {error}")
                         st.stop()
                     result_content = content
-                    name_source = video_title if video_title else extract_video_id(youtube_url) or "video"
-                    output_filename = make_output_filename(name_source, "youtube")
+                    name = video_title or extract_video_id(youtube_url) or "video"
+                    output_filename = make_output_filename(name, "youtube")
 
-                st.success("✅ Chuyển đổi thành công!")
-
-                st.download_button(
-                    label=f"⬇️ Tải file: {output_filename}",
-                    data=result_content,
-                    file_name=output_filename,
-                    mime="text/markdown",
-                    use_container_width=True
+                # ── Results card ──
+                st.markdown(
+                    '<div class="result-card">'
+                    '<div class="result-header">'
+                    '<div class="result-icon">✅</div>'
+                    '<div><div class="result-title">Chuyển đổi thành công!</div>'
+                    f'<div class="result-meta">{output_filename}</div>'
+                    '</div></div></div>',
+                    unsafe_allow_html=True
                 )
 
-                st.markdown("### Kết quả xem trước:")
-                st.text_area("Output", value=result_content, height=400, label_visibility="collapsed")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.download_button(
+                        label="⬇️  Tải file .md",
+                        data=result_content,
+                        file_name=output_filename,
+                        mime="text/markdown",
+                        use_container_width=True
+                    )
+                with col2:
+                    if st.button("📋  Copy nội dung", use_container_width=True):
+                        st.toast("Đã copy!")
+
+                st.markdown('<p class="section-label" style="margin-top:1.5rem">Xem trước nội dung</p>', unsafe_allow_html=True)
+                st.text_area(
+                    "preview",
+                    value=result_content,
+                    height=400,
+                    label_visibility="collapsed"
+                )
 
             except Exception as e:
                 st.error(f"❌ Đã xảy ra lỗi: {str(e)}")
