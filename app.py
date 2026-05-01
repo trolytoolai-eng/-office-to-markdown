@@ -554,19 +554,22 @@ def get_youtube_metadata(url):
             pass
     return title, description
 
-def create_ytt_api():
-    if proxy_mode == "Webshare" and ws_user and ws_pass and WebshareProxyConfig:
+def create_ytt_api(p_mode, p_user, p_pass, p_custom):
+    if p_mode == "Webshare" and p_user and p_pass and WebshareProxyConfig:
+        import urllib.parse
+        enc_user = urllib.parse.quote(p_user, safe='')
+        enc_pass = urllib.parse.quote(p_pass, safe='')
         return YouTubeTranscriptApi(proxy_config=WebshareProxyConfig(
-            proxy_username=ws_user, proxy_password=ws_pass,
+            proxy_username=enc_user, proxy_password=enc_pass,
         ))
-    elif proxy_mode == "Custom URL" and custom_proxy_raw and GenericProxyConfig:
-        url = parse_proxy_input(custom_proxy_raw)
+    elif p_mode == "Custom URL" and p_custom and GenericProxyConfig:
+        url = parse_proxy_input(p_custom)
         return YouTubeTranscriptApi(proxy_config=GenericProxyConfig(
             http_url=url, https_url=url,
         ))
     return YouTubeTranscriptApi()
 
-def get_youtube_transcript(url):
+def get_youtube_transcript(url, p_mode, p_user, p_pass, p_custom):
     video_id = extract_video_id(url)
     if not video_id:
         return None, None, "Không thể trích xuất Video ID."
@@ -574,7 +577,7 @@ def get_youtube_transcript(url):
     if not YouTubeTranscriptApi:
         return None, title, "youtube_transcript_api chưa được cài."
     try:
-        transcript = create_ytt_api().fetch(video_id)
+        transcript = create_ytt_api(p_mode, p_user, p_pass, p_custom).fetch(video_id)
         text = ' '.join([s.text for s in transcript.snippets])
     except Exception as e:
         msg = str(e)
@@ -619,7 +622,9 @@ if st.button("Convert to Markdown  →", type="primary", use_container_width=Tru
                     output_filename = make_output_filename(base_name, "file")
 
                 elif mode == "🔗  YouTube URL" and youtube_url:
-                    content, video_title, error = get_youtube_transcript(youtube_url)
+                    content, video_title, error = get_youtube_transcript(
+                        youtube_url, new_proxy_mode, new_ws_user, new_ws_pass, new_custom_proxy_raw
+                    )
                     if error:
                         st.error(f"❌ {error}")
                         st.stop()
