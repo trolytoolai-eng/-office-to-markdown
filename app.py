@@ -72,10 +72,13 @@ st.markdown("""
 
     /* ── Hide Streamlit chrome (keep sidebar toggle visible) ── */
     #MainMenu, footer, [data-testid="stToolbar"] { display: none !important; }
+    header[data-testid="stHeader"] {
+        background-color: transparent !important;
+    }
 
     /* ── Typography ── */
     h1, h2, h3 { font-family: 'DM Serif Display', Georgia, serif !important; color: var(--text-dark) !important; }
-    p, span, label, li, div { font-family: 'Inter', -apple-system, sans-serif !important; }
+    p, label, li { font-family: 'Inter', -apple-system, sans-serif !important; }
     h1 { font-size: 2.4rem !important; letter-spacing: -0.02em !important; }
 
     /* ── Card-style containers ── */
@@ -105,28 +108,15 @@ st.markdown("""
     [data-testid="stFileUploader"] button {
         border-radius: var(--radius-pill) !important;
         background: var(--primary) !important;
-        color: transparent !important;
+        color: white !important;
         border: none !important;
         padding: 0.5rem 1.5rem !important;
-        font-size: 0 !important;
         font-weight: 600 !important;
-        overflow: hidden !important;
-        position: relative !important;
         min-height: 38px !important;
+        transition: all 0.3s ease !important;
     }
-    [data-testid="stFileUploader"] button * {
-        font-size: 0 !important;
-        color: transparent !important;
-    }
-    [data-testid="stFileUploader"] button::after {
-        content: "Browse files";
-        font-size: 0.85rem !important;
-        font-family: 'Inter', sans-serif !important;
-        color: white !important;
-        position: absolute !important;
-        top: 50% !important;
-        left: 50% !important;
-        transform: translate(-50%, -50%) !important;
+    [data-testid="stFileUploader"] button:hover {
+        background: var(--primary-hover) !important;
     }
 
     /* ── Text inputs ── */
@@ -331,45 +321,53 @@ st.markdown("""
         color: var(--text-light);
         font-size: 0.78rem;
     }
+    
+    /* ── Mobile Responsiveness ── */
+    @media (max-width: 768px) {
+        .block-container {
+            padding-top: 1rem !important;
+            padding-bottom: 2rem !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+        }
+        h1 {
+            font-size: 1.8rem !important;
+        }
+        .hero-subtitle {
+            font-size: 0.95rem;
+        }
+        .format-chips {
+            gap: 6px;
+        }
+        .format-chip {
+            padding: 4px 10px;
+            font-size: 0.7rem;
+        }
+        .hero-badge {
+            font-size: 0.75rem;
+            padding: 4px 12px;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────
-# SIDEBAR — Proxy Settings (collapsed by default)
-# ─────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("### ⚙️ Proxy Settings")
-    st.caption("Cấu hình proxy khi YouTube chặn IP trên cloud.")
+# Load proxy config locally
+proxy_config_file = "proxy_config.json"
+try:
+    if os.path.exists(proxy_config_file):
+        with open(proxy_config_file, "r") as f:
+            proxy_config = json.load(f)
+    else:
+        proxy_config = {}
+except Exception:
+    proxy_config = {}
 
-    proxy_mode = st.radio(
-        "Loại Proxy:",
-        ["Không dùng (Local)", "Webshare", "Custom URL"],
-    )
-
-    ws_user = ""
-    ws_pass = ""
-    custom_proxy_raw = ""
-
-    if proxy_mode == "Webshare":
-        st.markdown(
-            "[webshare.io](https://www.webshare.io/) → gói **Residential** "
-            "→ [Proxy Settings](https://proxy2.webshare.io/proxy/settings)"
-        )
-        ws_user = st.text_input("Username", placeholder="webshare_username")
-        ws_pass = st.text_input("Password", type="password")
-        if ws_user and ws_pass:
-            st.success("✅ Proxy ready")
-    elif proxy_mode == "Custom URL":
-        custom_proxy_raw = st.text_input(
-            "Proxy",
-            placeholder="IP:PORT:USER:PASS",
-            type="password"
-        )
-        if custom_proxy_raw:
-            st.success("✅ Proxy ready")
-
-
+# Variables initialized globally from config
+proxy_mode = proxy_config.get("proxy_mode", "Không dùng (Local)")
+ws_user = proxy_config.get("ws_user", "")
+ws_pass = proxy_config.get("ws_pass", "")
+custom_proxy_raw = proxy_config.get("custom_proxy_raw", "")
 # ─────────────────────────────────────────────
 # HERO SECTION
 # ─────────────────────────────────────────────
@@ -378,7 +376,7 @@ st.markdown("# Office to Markdown")
 st.markdown(
     '<p class="hero-subtitle">'
     'Chuyển đổi tài liệu Office và video YouTube thành Markdown '
-    'chỉ trong vài giây — sẵn sàng cho AI & LLMs.'
+    'chỉ trong vài giây'
     '</p>',
     unsafe_allow_html=True
 )
@@ -422,6 +420,68 @@ else:
         placeholder="https://www.youtube.com/watch?v=...",
         label_visibility="visible"
     )
+    
+    with st.expander("⚙️ Cấu hình Proxy (Nếu bị YouTube chặn)"):
+        st.caption("Sử dụng khi bị giới hạn IP truy cập Youtube.")
+        
+        # Determine index for radio button
+        radio_options = ["Không dùng (Local)", "Webshare", "Custom URL"]
+        try:
+            default_index = radio_options.index(proxy_mode)
+        except ValueError:
+            default_index = 0
+            
+        new_proxy_mode = st.radio(
+            "Loại Proxy:",
+            radio_options,
+            index=default_index,
+            horizontal=True
+        )
+
+        new_ws_user = ws_user
+        new_ws_pass = ws_pass
+        new_custom_proxy_raw = custom_proxy_raw
+
+        if new_proxy_mode == "Webshare":
+            st.markdown(
+                "[webshare.io](https://www.webshare.io/) → gói **Residential** "
+                "→ [Proxy Settings](https://proxy2.webshare.io/proxy/settings)"
+            )
+            col1, col2 = st.columns(2)
+            with col1:
+                new_ws_user = st.text_input("Username", value=ws_user, placeholder="webshare_username")
+            with col2:
+                new_ws_pass = st.text_input("Password", value=ws_pass, type="password")
+            if new_ws_user and new_ws_pass:
+                st.success("✅ Proxy ready")
+        elif new_proxy_mode == "Custom URL":
+            new_custom_proxy_raw = st.text_input(
+                "Proxy",
+                value=custom_proxy_raw,
+                placeholder="IP:PORT:USER:PASS",
+                type="password"
+            )
+            if new_custom_proxy_raw:
+                st.success("✅ Proxy ready")
+                
+        if st.button("💾 Lưu cấu hình (Dùng cho lần sau)"):
+            try:
+                with open(proxy_config_file, "w") as f:
+                    json.dump({
+                        "proxy_mode": new_proxy_mode,
+                        "ws_user": new_ws_user,
+                        "ws_pass": new_ws_pass,
+                        "custom_proxy_raw": new_custom_proxy_raw
+                    }, f)
+                st.toast("✅ Đã lưu cấu hình proxy thành công!")
+                
+                # Update current session variables immediately
+                proxy_mode = new_proxy_mode
+                ws_user = new_ws_user
+                ws_pass = new_ws_pass
+                custom_proxy_raw = new_custom_proxy_raw
+            except Exception as e:
+                st.error(f"Không thể lưu cấu hình: {e}")
 
 st.markdown("")  # spacer
 

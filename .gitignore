@@ -3,3 +3,4 @@ __pycache__/
 .env
 *.exe
 gui_app.py
+proxy_config.json
