@@ -1,0 +1,4 @@
+markitdown[all]
+streamlit
+youtube-transcript-api
+yt-dlp
