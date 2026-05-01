@@ -148,25 +148,40 @@ def extract_video_id(url):
 
 
 def get_youtube_metadata(url):
-    """Lấy metadata (title, description) bằng yt-dlp."""
+    """Lấy metadata video: dùng YouTube oEmbed API (không bị chặn IP), fallback sang yt-dlp."""
+    import requests as req
     title = ""
     description = ""
+
+    # Cách 1: YouTube oEmbed API — miễn phí, không bị chặn IP
     try:
-        meta_cmd = [
-            "python", "-m", "yt_dlp",
-            "--dump-json", "--no-download",
-            "--skip-download",
-            url
-        ]
-        meta_result = subprocess.run(
-            meta_cmd, capture_output=True, text=True, timeout=30, encoding='utf-8'
-        )
-        if meta_result.returncode == 0 and meta_result.stdout.strip():
-            meta = json.loads(meta_result.stdout)
-            title = meta.get("title", "")
-            description = meta.get("description", "")
+        oembed_url = f"https://www.youtube.com/oembed?url={url}&format=json"
+        resp = req.get(oembed_url, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            title = data.get("title", "")
     except Exception:
         pass
+
+    # Cách 2: Fallback sang yt-dlp nếu oEmbed không lấy được (lấy thêm description)
+    if not title:
+        try:
+            meta_cmd = [
+                "python", "-m", "yt_dlp",
+                "--dump-json", "--no-download",
+                "--skip-download",
+                url
+            ]
+            meta_result = subprocess.run(
+                meta_cmd, capture_output=True, text=True, timeout=30, encoding='utf-8'
+            )
+            if meta_result.returncode == 0 and meta_result.stdout.strip():
+                meta = json.loads(meta_result.stdout)
+                title = meta.get("title", "")
+                description = meta.get("description", "")
+        except Exception:
+            pass
+
     return title, description
 
 
