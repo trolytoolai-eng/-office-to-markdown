@@ -14,10 +14,30 @@ except ImportError:
 
 try:
     from youtube_transcript_api import YouTubeTranscriptApi
+    from youtube_transcript_api.proxies import GenericProxyConfig
 except ImportError:
     YouTubeTranscriptApi = None
+    GenericProxyConfig = None
 
 st.set_page_config(page_title="Office to Markdown", page_icon="📝")
+
+# --- Sidebar: Proxy Settings ---
+with st.sidebar:
+    st.header("⚙️ Cài đặt Proxy")
+    st.caption(
+        "Khi deploy lên cloud (Streamlit Cloud, AWS...), YouTube sẽ chặn IP. "
+        "Nhập proxy để vượt qua giới hạn này. Bỏ trống nếu dùng trên máy cá nhân."
+    )
+    proxy_url = st.text_input(
+        "Proxy URL",
+        placeholder="http://user:pass@proxy-host:port",
+        help="Hỗ trợ HTTP/HTTPS/SOCKS proxy. Ví dụ: http://user:pass@p.webshare.io:80",
+        type="password"
+    )
+    if proxy_url:
+        st.success("✅ Proxy đã được cấu hình.")
+    else:
+        st.info("ℹ️ Không dùng proxy (phù hợp chạy local).")
 
 st.markdown("<h1>Office to Markdown</h1>", unsafe_allow_html=True)
 st.markdown("### 📄 Word, Excel, PDF ➡️ **Markdown (M↓)**")
@@ -100,7 +120,19 @@ def get_youtube_metadata(url):
     return title, description
 
 
-def get_youtube_transcript(url):
+def create_ytt_api(proxy_url_str):
+    """Tạo YouTubeTranscriptApi instance, có hoặc không có proxy."""
+    if proxy_url_str and GenericProxyConfig is not None:
+        proxy_config = GenericProxyConfig(
+            http_url=proxy_url_str,
+            https_url=proxy_url_str,
+        )
+        return YouTubeTranscriptApi(proxy_config=proxy_config)
+    else:
+        return YouTubeTranscriptApi()
+
+
+def get_youtube_transcript(url, proxy_url_str=""):
     """Lấy transcript YouTube bằng youtube_transcript_api + metadata bằng yt-dlp."""
     video_id = extract_video_id(url)
     if not video_id:
@@ -114,11 +146,18 @@ def get_youtube_transcript(url):
         return None, title, "Thư viện youtube_transcript_api chưa được cài đặt."
 
     try:
-        ytt_api = YouTubeTranscriptApi()
+        ytt_api = create_ytt_api(proxy_url_str)
         transcript = ytt_api.fetch(video_id)
         transcript_text = ' '.join([snippet.text for snippet in transcript.snippets])
     except Exception as e:
-        return None, title, f"Không lấy được transcript: {str(e)}"
+        error_msg = str(e)
+        if "RequestBlocked" in error_msg or "IpBlocked" in error_msg or "429" in error_msg:
+            return None, title, (
+                f"🚫 IP bị YouTube chặn: {error_msg}\n\n"
+                "**Cách khắc phục:** Mở thanh bên trái ⚙️ Cài đặt Proxy → nhập proxy URL.\n"
+                "Bạn có thể dùng dịch vụ proxy miễn phí/trả phí như Webshare, ProxyScrape..."
+            )
+        return None, title, f"Không lấy được transcript: {error_msg}"
 
     # Ghép thành Markdown
     md_parts = []
@@ -162,7 +201,7 @@ if st.button("Convert to Markdown", type="primary", use_container_width=True):
                     output_filename = make_output_filename(base_name, "file")
 
                 elif mode == "🔗 YouTube URL" and youtube_url:
-                    content, video_title, error = get_youtube_transcript(youtube_url)
+                    content, video_title, error = get_youtube_transcript(youtube_url, proxy_url)
                     if error:
                         st.error(f"❌ {error}")
                         st.stop()
