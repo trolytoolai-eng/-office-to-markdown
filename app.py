@@ -599,17 +599,29 @@ def get_youtube_transcript(url, p_mode, p_user, p_pass, p_custom):
     title, description = get_youtube_metadata(url)
     if not YouTubeTranscriptApi:
         return None, title, "youtube_transcript_api chưa được cài."
-    try:
-        transcript = create_ytt_api(p_mode, p_user, p_pass, p_custom).fetch(video_id)
-        text = ' '.join([s.text for s in transcript.snippets])
-    except Exception as e:
-        msg = str(e)
-        if any(k in msg for k in ["RequestBlocked", "IpBlocked", "429", "no element found"]):
-            return None, title, (
-                f"🚫 IP Proxy vừa dùng đã bị YouTube chặn.\n\n"
-                "💡 Mẹo: Vì Webshare là **Rotating Proxy**, bạn chỉ cần bấm **Convert to Markdown ->** thêm 1-2 lần nữa để nó đổi IP khác là sẽ thành công!"
-            )
-        return None, title, f"Lỗi: {msg}"
+    last_err = ""
+    text = ""
+    for attempt in range(5):
+        try:
+            api = create_ytt_api(p_mode, p_user, p_pass, p_custom)
+            transcript = api.fetch(video_id)
+            text = ' '.join([s.text for s in transcript.snippets])
+            break  # Thành công thì thoát loop
+        except Exception as e:
+            err_type = type(e).__name__
+            # Nếu video thật sự không có phụ đề thì không cần thử lại
+            if err_type in ["TranscriptsDisabled", "NoTranscriptFound", "VideoUnavailable"]:
+                return None, title, f"Video này không có phụ đề (Lỗi: {err_type})."
+            
+            last_err = str(e)
+            # Nếu đã thử 5 lần (attempt 0 đến 4) mà vẫn lỗi
+            if attempt == 4:
+                return None, title, (
+                    f"🚫 Đã thử 5 IP Proxy khác nhau nhưng đều bị YouTube chặn.\n\n"
+                    f"Có thể do YouTube đang càn quét dải IP của Webshare. Hãy thử lại sau nhé!\n"
+                    f"(Chi tiết lỗi cuối: {last_err})"
+                )
+            continue # Thử lại với IP mới
 
     parts = [f"# {title}" if title else "# YouTube Video", "", f"**URL:** {url}", ""]
     if description:
