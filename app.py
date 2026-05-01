@@ -459,7 +459,9 @@ else:
                     with st.spinner("Đang kiểm tra..."):
                         try:
                             import requests
-                            proxy_url = f"http://{new_ws_user}:{new_ws_pass}@p.webshare.io:80"
+                            user = new_ws_user.strip()
+                            pwd = new_ws_pass.strip()
+                            proxy_url = f"http://{user}:{pwd}@p.webshare.io:80"
                             res = requests.get("https://api.myip.com", proxies={"http": proxy_url, "https": proxy_url}, timeout=10)
                             if res.status_code == 200:
                                 st.success(f"Kết nối thành công! IP của proxy: {res.json().get('ip')}")
@@ -568,9 +570,12 @@ def get_youtube_metadata(url):
     return title, description
 
 def create_ytt_api(p_mode, p_user, p_pass, p_custom):
-    if p_mode == "Webshare" and p_user and p_pass and WebshareProxyConfig:
-        return YouTubeTranscriptApi(proxy_config=WebshareProxyConfig(
-            proxy_username=p_user, proxy_password=p_pass,
+    if p_mode == "Webshare" and p_user and p_pass and GenericProxyConfig:
+        user = p_user.strip()
+        pwd = p_pass.strip()
+        url = f"http://{user}:{pwd}@p.webshare.io:80"
+        return YouTubeTranscriptApi(proxy_config=GenericProxyConfig(
+            http_url=url, https_url=url,
         ))
     elif p_mode == "Custom URL" and p_custom and GenericProxyConfig:
         url = parse_proxy_input(p_custom)
