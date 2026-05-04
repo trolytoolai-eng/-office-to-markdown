@@ -4,3 +4,4 @@ __pycache__/
 *.exe
 gui_app.py
 proxy_config.json
+app_config.json

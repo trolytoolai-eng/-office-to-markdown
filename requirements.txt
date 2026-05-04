@@ -2,3 +2,6 @@ markitdown[all]
 streamlit
 youtube-transcript-api
 yt-dlp
+markdown
+pymupdf4llm
+openai
