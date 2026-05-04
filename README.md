@@ -1,6 +1,6 @@
 # Office to Markdown Converter
 
-![Giao diện Office to Markdown](screenshots/demo.png)
+![Giao diện Office to Markdown](screenshots/1.png)
 
 Một ứng dụng web hiện đại được xây dựng bằng Python & Streamlit giúp bạn chuyển đổi nhanh chóng các file tài liệu (Word, Excel, PDF, PowerPoint...) và bóc băng Video YouTube sang định dạng Markdown chuẩn xác.
 
